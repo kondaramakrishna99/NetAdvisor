@@ -1,0 +1,52 @@
+//
+//  ScannedNetwork.swift
+//  NetAdvisor
+//
+//  Created by Rama Krishna Konda on 16/12/25.
+//
+
+import Foundation
+import CoreWLAN
+
+public struct ScannedNetwork: Identifiable, Hashable, Equatable {
+    public let id: String
+    public let ssid: String
+    public let rssi: Int
+    public let channel: Int
+    public let band: WiFiBand
+    public let security: String
+    public let isHidden: Bool
+
+    public init(
+        id: String,
+        ssid: String,
+        rssi: Int,
+        channel: Int,
+        band: WiFiBand,
+        security: String,
+        isHidden: Bool
+    ) {
+        self.id = id
+        self.ssid = ssid
+        self.rssi = rssi
+        self.channel = channel
+        self.band = band
+        self.security = security
+        self.isHidden = isHidden
+    }
+
+    public init(from cwNetwork: CWNetwork) {
+        self.id = cwNetwork.bssid ?? UUID().uuidString
+        self.ssid = cwNetwork.ssid ?? "Hidden"
+        self.rssi = cwNetwork.rssiValue
+        self.channel = cwNetwork.wlanChannel?.channelNumber ?? 0
+        self.band = cwNetwork.wlanChannel?.channelBand == .band5GHz ? .fiveGHz : .twoPointFourGHz
+        self.security = NetworkScanner.securityDescription(for: cwNetwork)
+        self.isHidden = cwNetwork.ssid == nil
+    }
+}
+
+public enum NetworkBand: Equatable {
+    case twoPointFourGHz
+    case fiveGHz
+}

@@ -1,10 +1,3 @@
-//
-//  NetworkScanner.swift
-//  NetAdvisor
-//
-//  Created by Rama Krishna Konda on 14/12/25.
-//
-
 import Foundation
 import CoreWLAN
 import CoreLocation
@@ -13,7 +6,6 @@ import CoreLocation
 public final class NetworkScanner: NSObject, CLLocationManagerDelegate {
 
     // MARK: - Core Properties
-
     private let wifiClient = CWWiFiClient.shared()
     private let locationManager = CLLocationManager()
     private var interface: CWInterface?
@@ -21,7 +13,6 @@ public final class NetworkScanner: NSObject, CLLocationManagerDelegate {
     private var pendingScanCompletion: (([CWNetwork]) -> Void)?
 
     // MARK: - Init
-
     public override init() {
         super.init()
         print("=== NetAdvisor NetworkScanner Initialized ===")
@@ -50,51 +41,23 @@ public final class NetworkScanner: NSObject, CLLocationManagerDelegate {
         switch status {
         case .notDetermined:
             print("🔒 Requesting location permission to scan Wi-Fi networks...")
-            print("""
-                ℹ️  macOS requires location access to scan for Wi-Fi networks.
-                
-                To enable location access:
-                1. Open System Settings
-                2. Go to Privacy & Security > Location Services
-                3. Click the lock icon and enter your password
-                4. Make sure Location Services is turned ON
-                5. Find and enable "Terminal" in the list
-                
-                If you don't see NetAdvisor in the list:
-                1. Run this command in Terminal to reset location services:
-                   sudo tccutil reset Location
-                2. Try running this app again
-                3. When prompted, click "Allow" to grant location access
-                
-                Note: Your actual location is not sent anywhere - this permission is needed
-                because Wi-Fi scanning is considered a location service on macOS.
-                """)
             pendingScanCompletion = completion
             locationManager.requestWhenInUseAuthorization()
 
         case .authorized, .authorizedAlways:
             performNetworkScan(completion: completion)
-            
+
         case .denied, .restricted:
-            print("""
-            ❌ Location permission denied – cannot scan Wi‑Fi
-            
-            To fix this:
-            1. Open System Settings
-            2. Go to Privacy & Security > Location Services
-            3. Enable Location Services if it's off
-            4. Find and enable the Terminal app in the list
-            5. Try running the command again
-            """)
+            print("❌ Location permission denied – cannot scan Wi‑Fi")
             completion([])
-            
+
         @unknown default:
             print("❌ Unknown location authorization status")
             completion([])
         }
     }
 
-    /// Returns information about the currently connected network (typed model)
+    /// Returns information about the currently connected network
     public func getCurrentNetwork() -> CurrentNetwork? {
         guard let interface = interface,
               let ssid = interface.ssid() else {
@@ -113,15 +76,9 @@ public final class NetworkScanner: NSObject, CLLocationManagerDelegate {
     }
 
     // MARK: - Core Scan Logic
-
     private func performNetworkScan(completion: @escaping ([CWNetwork]) -> Void) {
-        guard let interface = interface else {
-            completion([])
-            return
-        }
-
-        guard interface.powerOn() else {
-            print("❌ Wi‑Fi is turned off")
+        guard let interface = interface, interface.powerOn() else {
+            print("❌ Wi‑Fi is turned off or interface unavailable")
             completion([])
             return
         }
@@ -129,8 +86,8 @@ public final class NetworkScanner: NSObject, CLLocationManagerDelegate {
         do {
             print("🔍 NetAdvisor scanning Wi‑Fi networks...")
             let networks = try interface.scanForNetworks(withName: nil, includeHidden: true)
-            let sorted = networks.sorted { $0.rssiValue > $1.rssiValue }
-            completion(sorted)
+            let sortedNetworks = networks.sorted { $0.rssiValue > $1.rssiValue }
+            completion(sortedNetworks)
         } catch {
             print("❌ Wi‑Fi scan failed: \(error.localizedDescription)")
             completion([])
@@ -138,20 +95,16 @@ public final class NetworkScanner: NSObject, CLLocationManagerDelegate {
     }
 
     // MARK: - CLLocationManagerDelegate
-
-    @available(macOS 10.15, *)
     public func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         let status: CLAuthorizationStatus
-        
         if #available(macOS 11.0, *) {
             status = manager.authorizationStatus
         } else {
             status = CLLocationManager.authorizationStatus()
         }
-        
-        print("🔒 Location authorization status changed: \(statusDescription(status))")
-        
-        if let completion = pendingScanCompletion, status == .authorized || status.rawValue == 3 /* .authorizedAlways */ {
+
+        if let completion = pendingScanCompletion,
+           status == .authorized || status.rawValue == 3 /* .authorizedAlways */ {
             print("✅ Location permission granted, resuming Wi-Fi scan...")
             performNetworkScan(completion: completion)
             pendingScanCompletion = nil
@@ -161,23 +114,21 @@ public final class NetworkScanner: NSObject, CLLocationManagerDelegate {
             pendingScanCompletion = nil
         }
     }
-    
-    private func statusDescription(_ status: CLAuthorizationStatus) -> String {
-        switch status {
-        case .notDetermined: return "Not Determined"
-        case .restricted: return "Restricted"
-        case .denied: return "Denied"
-        case .authorizedAlways: return "Authorized Always"
-        @unknown default: return "Unknown"
-        }
+
+    // MARK: - Helpers
+    public static func securityDescription(for network: CWNetwork) -> String {
+        if network.supportsSecurity(.wpa3Personal) { return "WPA3" }
+        if network.supportsSecurity(.wpa3Enterprise) { return "WPA3 Enterprise" }
+        if network.supportsSecurity(.wpa2Personal) { return "WPA2" }
+        if network.supportsSecurity(.wpa2Enterprise) { return "WPA2 Enterprise" }
+        if network.supportsSecurity(.wpaPersonal) { return "WPA" }
+        if network.supportsSecurity(.wpaEnterprise) { return "WPA Enterprise" }
+        if network.supportsSecurity(.WEP) { return "WEP" }
+        return "Open"
     }
-    
-    // MARK: - Formatting (Debug / CLI Use)
 
     public func formatNetworks(_ networks: [CWNetwork]) -> String {
-        guard !networks.isEmpty else {
-            return "No networks found"
-        }
+        guard !networks.isEmpty else { return "No networks found" }
 
         var result = "Available Networks (\(networks.count) found):\n"
         result += "--------------------------------------------------\n"
@@ -188,21 +139,17 @@ public final class NetworkScanner: NSObject, CLLocationManagerDelegate {
             let band = network.wlanChannel?.channelBand == .band5GHz ? "5GHz" : "2.4GHz"
 
             result += "\n\(index + 1). \(ssid)"
-            if network.ssid == nil {
-                result += " (Hidden)"
-            }
+            if network.ssid == nil { result += " (Hidden)" }
             result += "\n   BSSID: \(bssid)"
             result += "\n   Signal: \(network.rssiValue) dBm"
             result += "\n   Channel: \(network.wlanChannel?.channelNumber ?? 0) (\(band))"
-            result += "\n   Security: \(securityDescription(for: network))"
+            result += "\n   Security: \(NetworkScanner.securityDescription(for: network))"
             result += "\n   Signal Quality: \(signalQuality(network.rssiValue))/5"
             result += "\n"
         }
 
         return result
     }
-
-    // MARK: - Helpers
 
     private func signalQuality(_ rssi: Int) -> Int {
         switch rssi {
@@ -213,21 +160,22 @@ public final class NetworkScanner: NSObject, CLLocationManagerDelegate {
         default: return 1
         }
     }
-
-    private func securityDescription(for network: CWNetwork) -> String {
-        if network.supportsSecurity(.wpa3Personal) { return "WPA3" }
-        if network.supportsSecurity(.wpa3Enterprise) { return "WPA3 Enterprise" }
-        if network.supportsSecurity(.wpa2Personal) { return "WPA2" }
-        if network.supportsSecurity(.wpa2Enterprise) { return "WPA2 Enterprise" }
-        if network.supportsSecurity(.wpaPersonal) { return "WPA" }
-        if network.supportsSecurity(.wpaEnterprise) { return "WPA Enterprise" }
-        if network.supportsSecurity(.WEP) { return "WEP" }
-        return "Open"
+    
+    private func mapToDomain(_ network: CWNetwork) -> ScannedNetwork {
+        let band: WiFiBand = network.wlanChannel?.channelBand == .band5GHz ? .fiveGHz : .twoPointFourGHz
+        return ScannedNetwork(
+            id: network.bssid ?? UUID().uuidString,
+            ssid: network.ssid ?? "Hidden",
+            rssi: network.rssiValue,
+            channel: network.wlanChannel?.channelNumber ?? 0,
+            band: band,
+            security: NetworkScanner.securityDescription(for: network),
+            isHidden: network.ssid == nil
+        )
     }
 }
 
 // MARK: - Supporting Models
-
 public struct CurrentNetwork {
     public let ssid: String
     public let bssid: String

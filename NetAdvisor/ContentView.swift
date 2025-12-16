@@ -11,164 +11,138 @@ import CoreWLAN
 @available(macOS 10.15, *)
 struct ContentView: View {
 
-    // MARK: - State
+    // MARK: - ViewModel
 
-    @State private var networks: [CWNetwork] = []
-    @State private var statusMessage: String = "Ready"
-    @State private var isScanning: Bool = false
+    @StateObject private var viewModel = NetworkViewModel()
 
-    private let scanner = NetworkScanner()
-
-    // MARK: - View
+    // MARK: - Body
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        NavigationView {
+            VStack(spacing: 16) {
 
-            headerView
+                // MARK: - Status Bar
+                statusSection
 
-            Divider()
+                // MARK: - Scan Button
+                scanButton
 
-            if isScanning {
-                ProgressView("Scanning Wi-Fi networks…")
-            } else if networks.isEmpty {
-                Text(statusMessage)
-                    .foregroundColor(.secondary)
-            } else {
-                networkListView
+                // MARK: - Network List
+                networkList
             }
-
-            Spacer()
-
-            Divider()
-
-            footerView
-        }
-        .padding()
-        .frame(minWidth: 650, minHeight: 450)
-        .onAppear {
-            scanNetworks()
+            .padding()
+            .navigationTitle("NetAdvisor")
         }
     }
 
-    // MARK: - Header
+    // MARK: - Status Section
 
-    private var headerView: some View {
+    private var statusSection: some View {
+        VStack(spacing: 8) {
+            statusRow(
+                title: "Internet",
+                isHealthy: viewModel.isInternetAvailable
+            )
+
+            statusRow(
+                title: "Wi-Fi Path",
+                isHealthy: viewModel.isWiFiPathHealthy
+            )
+        }
+        .padding()
+        .background(Color(.windowBackgroundColor))
+        .cornerRadius(12)
+    }
+
+    private func statusRow(title: String, isHealthy: Bool) -> some View {
         HStack {
-            Text("NetAdvisor – Available Wi-Fi Networks")
+            Text(title)
                 .font(.headline)
 
             Spacer()
 
-            Button(action: scanNetworks) {
-                Label("Rescan", systemImage: "arrow.clockwise")
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(isHealthy ? Color.green : Color.red)
+                    .frame(width: 10, height: 10)
+
+                Text(isHealthy ? "Healthy" : "Unhealthy")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
             }
-            .disabled(isScanning)
         }
+    }
+
+    // MARK: - Scan Button
+
+    private var scanButton: some View {
+        Button(action: {
+            viewModel.scanOnce()
+        }) {
+            HStack {
+                if viewModel.isScanning {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                }
+
+                Text(viewModel.isScanning ? "Scanning..." : "Scan Now")
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(viewModel.isScanning)
     }
 
     // MARK: - Network List
 
-    private var networkListView: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(networks.indices, id: \.self) { index in
-                    NetworkRow(
-                        index: index + 1,
-                        network: networks[index]
-                    )
-                    Divider()
-                }
-            }
+    private var networkList: some View {
+        List(viewModel.networks) { network in
+            NetworkRow(network: network)
         }
-    }
-
-    // MARK: - Footer
-
-    private var footerView: some View {
-        HStack {
-            Text("Found \(networks.count) network(s)")
-                .font(.footnote)
-                .foregroundColor(.secondary)
-
-            Spacer()
-
-            if let current = scanner.getCurrentNetwork() {
-                Text("Connected: \(current.ssid)")
-                    .font(.footnote)
-            }
-        }
-    }
-
-    // MARK: - Actions
-
-    private func scanNetworks() {
-        isScanning = true
-        statusMessage = "Scanning…"
-        networks = []
-
-        scanner.scanForNetworks { scanned in
-            DispatchQueue.main.async {
-                self.networks = scanned
-                self.isScanning = false
-                self.statusMessage = scanned.isEmpty
-                    ? "No Wi-Fi networks found or permission denied."
-                    : "Scan complete"
-            }
-        }
+        .listStyle(.inset)
     }
 }
 
-@available(macOS 10.15, *)
-private struct NetworkRow: View {
+#Preview {
+    ContentView()
+}
 
-    let index: Int
-    let network: CWNetwork
+struct NetworkRow: View {
+
+    let network: ScannedNetwork
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text("\(index). \(network.ssid ?? "Hidden Network")")
-                    .font(.system(.body, design: .monospaced))
+        HStack {
 
-                if network.ssid == nil {
-                    Text("(Hidden)")
-                        .foregroundColor(.secondary)
-                }
+            // Signal Strength
+            signalBars
 
-                Spacer()
+            VStack(alignment: .leading, spacing: 4) {
+                Text(network.ssid)
+                    .font(.headline)
 
-                Text("\(network.rssiValue) dBm")
-                    .foregroundColor(signalColor)
+                Text(network.details)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
 
-            HStack(spacing: 16) {
-                Text("Channel: \(network.wlanChannel?.channelNumber ?? 0)")
-                Text("Band: \(bandDescription)")
-                Text("Security: \(securityDescription)")
-            }
-            .font(.footnote)
-            .foregroundColor(.secondary)
+            Spacer()
+
+            Text("\(network.rssi) dBm")
+                .font(.caption)
+                .foregroundColor(.secondary)
         }
         .padding(.vertical, 4)
     }
 
-    private var bandDescription: String {
-        network.wlanChannel?.channelBand == .band5GHz ? "5 GHz" : "2.4 GHz"
-    }
-
-    private var securityDescription: String {
-        if network.supportsSecurity(.wpa3Personal) { return "WPA3" }
-        if network.supportsSecurity(.wpa2Personal) { return "WPA2" }
-        if network.supportsSecurity(.wpaPersonal) { return "WPA" }
-        return "Open"
-    }
-
-    private var signalColor: Color {
-        switch network.rssiValue {
-        case -50...0: return .green
-        case -65..<(-50): return .yellow
-        case -75..<(-65): return .orange
-        default: return .red
+    private var signalBars: some View {
+        HStack(spacing: 2) {
+            ForEach(0..<network.signalBars, id: \.self) { index in
+                Rectangle()
+                    .fill(index < network.signalBars ? Color.green : Color.gray.opacity(0.3))
+                    .frame(width: 4, height: CGFloat(6 + index * 4))
+            }
         }
+        .frame(width: 24)
     }
 }
