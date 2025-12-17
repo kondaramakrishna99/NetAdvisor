@@ -29,6 +29,8 @@ struct ContentView: View {
 
                 // MARK: - Network List
                 networkList
+            }.onDisappear {
+                viewModel.stop()
             }
             .padding()
             .navigationTitle("NetAdvisor")
@@ -136,11 +138,16 @@ struct NetworkRow: View {
     }
 
     private var signalBars: some View {
-        HStack(spacing: 2) {
-            ForEach(0..<network.signalBars, id: \.self) { index in
+        let bars = network.signalBars   // 👈 reduce inference
+
+        return HStack(spacing: 2) {
+            ForEach(0..<bars, id: \.self) { index in
+                let barHeight = CGFloat(6 + index * 4)
+                let barColor: Color = .green
+
                 Rectangle()
-                    .fill(index < network.signalBars ? Color.green : Color.gray.opacity(0.3))
-                    .frame(width: 4, height: CGFloat(6 + index * 4))
+                    .fill(barColor)
+                    .frame(width: 4, height: barHeight)
             }
         }
         .frame(width: 24)

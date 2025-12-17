@@ -44,6 +44,20 @@ public struct ScannedNetwork: Identifiable, Hashable, Equatable {
         self.security = NetworkScanner.securityDescription(for: cwNetwork)
         self.isHidden = cwNetwork.ssid == nil
     }
+    
+    var details: String {
+            let bandText = band == .fiveGHz ? "5 GHz" : "2.4 GHz"
+            return "\(bandText) • Ch \(channel) • \(security)"
+        }
+    
+    var signalBars: Int {
+            switch rssi {
+            case -50...0: return 4
+            case -60..<(-50): return 3
+            case -70..<(-60): return 2
+            default: return 1
+            }
+        }
 }
 
 public enum NetworkBand: Equatable {

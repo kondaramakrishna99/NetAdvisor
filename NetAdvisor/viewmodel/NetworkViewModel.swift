@@ -8,26 +8,21 @@
 import Foundation
 import Combine
 import SwiftUI
+import CoreWLAN
 
 @MainActor
 final class NetworkViewModel: ObservableObject {
 
-    // MARK: - Published State (UI)
-
     @Published var networks: [ScannedNetwork] = []
-    @Published var isScanning: Bool = false
-    @Published var isInternetAvailable: Bool = false
-    @Published var isWiFiPathHealthy: Bool = false
-
-    // MARK: - Dependencies
+    @Published var isScanning = false
+    @Published var isInternetAvailable = false
+    @Published var isWiFiPathHealthy = false
 
     private let scanner: NetworkScanner
     private let healthMonitor: NetworkHealthMonitor
     private let scheduler: NetworkScheduler
 
     private var cancellables = Set<AnyCancellable>()
-
-    // MARK: - Designated Initializer (NO defaults)
 
     init(
         scanner: NetworkScanner,
@@ -42,8 +37,6 @@ final class NetworkViewModel: ObservableObject {
         startPeriodicScanning()
     }
 
-    // MARK: - Convenience Initializer (SAFE)
-
     convenience init() {
         self.init(
             scanner: NetworkScanner(),
@@ -52,48 +45,38 @@ final class NetworkViewModel: ObservableObject {
         )
     }
 
-    // MARK: - Bind Health Signals
+    func stop() {
+        scheduler.stop()
+        cancellables.removeAll()
+    }
 
     private func bindHealthMonitor() {
-
         healthMonitor.$isPathHealthy
-            .sink { [weak self] healthy in
-                self?.isWiFiPathHealthy = healthy
-            }
+            .sink { [weak self] in self?.isWiFiPathHealthy = $0 }
             .store(in: &cancellables)
 
         healthMonitor.$isInternetReachable
-            .sink { [weak self] reachable in
-                self?.isInternetAvailable = reachable
-            }
+            .sink { [weak self] in self?.isInternetAvailable = $0 }
             .store(in: &cancellables)
     }
 
-    // MARK: - Scanning Control
-
     private func startPeriodicScanning() {
         scheduler.start(interval: 20) { [weak self] in
-            guard let self else { return }
-
-            if self.isWiFiPathHealthy {
-                self.scanOnce()
-            }
+            guard let self, self.isWiFiPathHealthy else { return }
+            self.scanOnce()
         }
     }
 
     func scanOnce() {
         isScanning = true
-
-        scanner.scanForNetworks { [weak self] scanned in
+        scanner.scanForNetworks { [weak self] cwNetworks in
             guard let self else { return }
-            self.networks = scanned
+            self.networks = cwNetworks.map { ScannedNetwork(from: $0) }
             self.isScanning = false
         }
     }
 
-    // MARK: - Cleanup
-
     deinit {
-        scheduler.stop()
+        // ✅ empty on purpose (Swift 6 safe)
     }
 }
