@@ -98,8 +98,16 @@ struct ContentView: View {
     // MARK: - Network List
 
     private var networkList: some View {
-        List(viewModel.networks) { network in
-            NetworkRow(network: network)
+        List {
+            ForEach(viewModel.networks) { network in
+                NetworkRow(
+                    network: network,
+                    isBest: network.isRecommended(
+                        comparedTo: viewModel.networks,
+                        internetAvailable: viewModel.isInternetAvailable
+                    )
+                )
+            }
         }
         .listStyle(.inset)
     }
@@ -112,30 +120,45 @@ struct ContentView: View {
 struct NetworkRow: View {
 
     let network: ScannedNetwork
-
+    let isBest: Bool
+    
     var body: some View {
-        HStack {
+            HStack {
 
-            // Signal Strength
-            signalBars
+                signalBars
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(network.ssid)
-                    .font(.headline)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text(network.ssid)
+                            .font(.headline)
 
-                Text(network.details)
+                        if isBest {
+                            bestBadge
+                        }
+                    }
+
+                    Text(network.details)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                Text("\(network.rssi) dBm")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
-
-            Spacer()
-
-            Text("\(network.rssi) dBm")
-                .font(.caption)
-                .foregroundColor(.secondary)
+            .padding(.vertical, 4)
         }
-        .padding(.vertical, 4)
-    }
+    
+    private var bestBadge: some View {
+         Text("BEST")
+             .font(.caption2)
+             .padding(.horizontal, 6)
+             .padding(.vertical, 2)
+             .background(Color.green.opacity(0.2))
+             .cornerRadius(6)
+     }
 
     private var signalBars: some View {
         let bars = network.signalBars   // 👈 reduce inference

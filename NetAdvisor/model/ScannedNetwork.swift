@@ -58,6 +58,25 @@ public struct ScannedNetwork: Identifiable, Hashable, Equatable {
             default: return 1
             }
         }
+    
+    func score(internetAvailable: Bool) -> Int {
+            NetworkScoreCalculator.score(
+                network: self,
+                internetAvailable: internetAvailable
+            )
+        }
+
+    func isRecommended(
+            comparedTo others: [ScannedNetwork],
+            internetAvailable: Bool
+        ) -> Bool {
+            let myScore = score(internetAvailable: internetAvailable)
+            let bestOther = others
+                .map { $0.score(internetAvailable: internetAvailable) }
+                .max() ?? 0
+
+            return myScore == bestOther
+        }
 }
 
 public enum NetworkBand: Equatable {

@@ -69,9 +69,17 @@ final class NetworkViewModel: ObservableObject {
 
     func scanOnce() {
         isScanning = true
+
         scanner.scanForNetworks { [weak self] cwNetworks in
             guard let self else { return }
-            self.networks = cwNetworks.map { ScannedNetwork(from: $0) }
+
+            let scanned = cwNetworks.map { ScannedNetwork(from: $0) }
+
+            self.networks = scanned.sorted {
+                $0.score(internetAvailable: self.isInternetAvailable) >
+                $1.score(internetAvailable: self.isInternetAvailable)
+            }
+
             self.isScanning = false
         }
     }
