@@ -99,14 +99,11 @@ struct ContentView: View {
 
     private var networkList: some View {
         List {
-            ForEach(viewModel.networks) { network in
+            ForEach(Array(viewModel.networks.enumerated()), id: \.element.id) { index, network in
                 NetworkRow(
                     network: network,
-                    isBest: network.isRecommended(
-                        comparedTo: viewModel.networks,
-                        internetAvailable: viewModel.isInternetAvailable
-                    ),
-                    isCurrent: network.isCurrent(currentSSID: viewModel.currentSSID)
+                    isBest: network.id == viewModel.bestNetworkID,
+                    isCurrent: network.id == viewModel.currentNetworkID
                 )
             }
         }

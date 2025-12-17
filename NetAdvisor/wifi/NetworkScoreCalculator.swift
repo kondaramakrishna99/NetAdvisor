@@ -14,48 +14,44 @@ struct NetworkScoreCalculator {
         internetAvailable: Bool
     ) -> Int {
 
-        var score = 0
+        let signal = signalScore(network.rssi)
+        let band = bandScore(network.band)
+        let security = securityScore(network.security)
+        let internet = internetAvailable ? 10 : 0
 
-        // 1️⃣ Signal strength (max 50)
-        score += signalScore(network.rssi)
-
-        // 2️⃣ Band preference (max 20)
-        score += bandScore(network.band)
-
-        // 3️⃣ Security bonus (max 20)
-        score += securityScore(network.security)
-
-        // 4️⃣ Internet availability (max 10)
-        if internetAvailable {
-            score += 10
+        // 🔑 Hard guard: weak signal can NEVER be best
+        if signal < 20 {
+            return signal + internet
         }
 
-        return min(score, 100)
+        let total = signal + band + security + internet
+        return min(total, 100)
     }
 
     // MARK: - Subscores
 
     private static func signalScore(_ rssi: Int) -> Int {
         switch rssi {
-        case -50...0: return 50
-        case -60..<(-50): return 40
-        case -70..<(-60): return 30
-        case -80..<(-70): return 20
-        default: return 10
+        case -45...0: return 55
+        case -55..<(-45): return 45
+        case -65..<(-55): return 35
+        case -75..<(-65): return 25
+        case -85..<(-75): return 15
+        default: return 5
         }
     }
 
     private static func bandScore(_ band: WiFiBand) -> Int {
         switch band {
-        case .fiveGHz: return 20
-        case .twoPointFourGHz: return 10
+        case .fiveGHz: return 10   // reduced weight
+        case .twoPointFourGHz: return 5
         }
     }
 
     private static func securityScore(_ security: String) -> Int {
-        if security.contains("WPA3") { return 20 }
-        if security.contains("WPA2") { return 15 }
-        if security.contains("WPA") { return 10 }
+        if security.contains("WPA3") { return 10 }
+        if security.contains("WPA2") { return 7 }
+        if security.contains("WPA") { return 4 }
         return 0
     }
 }

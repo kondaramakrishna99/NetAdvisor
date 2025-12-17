@@ -78,9 +78,18 @@ public struct ScannedNetwork: Identifiable, Hashable, Equatable {
             return myScore == bestOther
         }
     
-    func isCurrent(currentSSID: String?) -> Bool {
-            guard let currentSSID else { return false }
-            return ssid == currentSSID
+    func isCurrent(
+            currentSSID: String?,
+            allNetworks: [ScannedNetwork]
+        ) -> Bool {
+            guard let currentSSID, ssid == currentSSID else {
+                return false
+            }
+
+            let sameSSID = allNetworks.filter { $0.ssid == currentSSID }
+            let strongest = sameSSID.max(by: { $0.rssi < $1.rssi })
+
+            return strongest?.id == self.id
         }
 }
 

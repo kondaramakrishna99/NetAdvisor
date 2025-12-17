@@ -9,6 +9,9 @@ import SwiftUI
 
 @main
 struct NetAdvisorApp: App {
+    init() {
+        NotificationManager.shared.requestPermissionIfNeeded()
+    }
     var body: some Scene {
         WindowGroup {
             ContentView()
