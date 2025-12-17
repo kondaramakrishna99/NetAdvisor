@@ -77,6 +77,11 @@ public struct ScannedNetwork: Identifiable, Hashable, Equatable {
 
             return myScore == bestOther
         }
+    
+    func isCurrent(currentSSID: String?) -> Bool {
+            guard let currentSSID else { return false }
+            return ssid == currentSSID
+        }
 }
 
 public enum NetworkBand: Equatable {

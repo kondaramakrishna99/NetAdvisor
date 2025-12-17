@@ -17,7 +17,8 @@ final class NetworkViewModel: ObservableObject {
     @Published var isScanning = false
     @Published var isInternetAvailable = false
     @Published var isWiFiPathHealthy = false
-
+    @Published var currentSSID: String?
+    
     private let scanner: NetworkScanner
     private let healthMonitor: NetworkHealthMonitor
     private let scheduler: NetworkScheduler
@@ -72,7 +73,8 @@ final class NetworkViewModel: ObservableObject {
 
         scanner.scanForNetworks { [weak self] cwNetworks in
             guard let self else { return }
-
+            self.currentSSID = self.scanner.getCurrentNetwork()?.ssid
+            
             let scanned = cwNetworks.map { ScannedNetwork(from: $0) }
 
             self.networks = scanned.sorted {

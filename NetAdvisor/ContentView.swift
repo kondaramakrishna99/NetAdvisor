@@ -105,7 +105,8 @@ struct ContentView: View {
                     isBest: network.isRecommended(
                         comparedTo: viewModel.networks,
                         internetAvailable: viewModel.isInternetAvailable
-                    )
+                    ),
+                    isCurrent: network.isCurrent(currentSSID: viewModel.currentSSID)
                 )
             }
         }
@@ -121,6 +122,7 @@ struct NetworkRow: View {
 
     let network: ScannedNetwork
     let isBest: Bool
+    let isCurrent: Bool
     
     var body: some View {
             HStack {
@@ -133,8 +135,12 @@ struct NetworkRow: View {
                             .font(.headline)
 
                         if isBest {
-                            bestBadge
+                            badge(text: "BEST", color: .green)
                         }
+                        
+                        if isCurrent {
+                               badge(text: "CURRENT", color: .blue)
+                           }
                     }
 
                     Text(network.details)
@@ -151,15 +157,16 @@ struct NetworkRow: View {
             .padding(.vertical, 4)
         }
     
-    private var bestBadge: some View {
-         Text("BEST")
-             .font(.caption2)
-             .padding(.horizontal, 6)
-             .padding(.vertical, 2)
-             .background(Color.green.opacity(0.2))
-             .cornerRadius(6)
-     }
-
+    private func badge(text: String, color: Color) -> some View {
+        Text(text)
+            .font(.caption2)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(color.opacity(0.2))
+            .foregroundColor(color)
+            .cornerRadius(6)
+    }
+    
     private var signalBars: some View {
         let bars = network.signalBars   // 👈 reduce inference
 
